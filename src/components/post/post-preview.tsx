@@ -1,20 +1,40 @@
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Bookmark, Ellipsis, Heart, MessageCircle, X } from 'lucide-react'
+import { Bookmark, Ellipsis, MessageCircle, X } from 'lucide-react'
 import { type FormEvent, useRef, useState } from 'react'
 
 import { Avatar } from '../avatar'
+import type { PostProps } from '.'
 import { Comment } from './comment'
+import { Options } from './options'
+import { Reaction } from './reaction'
 
 interface PostPreviewProps {
+  post: PostProps
+  user?: {
+    name: string
+    avatar: string
+  }
+  backgroundColor?: string
   open: boolean
   setOpen(): void
 }
 
-export function PostPreview({ open, setOpen }: PostPreviewProps) {
+export function PostPreview({
+  post,
+  user,
+  backgroundColor,
+  open,
+  setOpen,
+}: PostPreviewProps) {
   const [comment, setComment] = useState('')
+  const [modalOptions, setModalOptions] = useState(false)
 
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  function handleModalOptions() {
+    setModalOptions(!modalOptions)
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -24,7 +44,7 @@ export function PostPreview({ open, setOpen }: PostPreviewProps) {
     open && (
       <div
         onClick={setOpen}
-        className="absolute inset-0 flex justify-center bg-black/25 py-8"
+        className="absolute inset-0 z-10 flex justify-center bg-black/25 py-8"
       >
         <X
           onClick={setOpen}
@@ -36,45 +56,58 @@ export function PostPreview({ open, setOpen }: PostPreviewProps) {
           className="w-[1280px] grid grid-cols-12 rounded-lg bg-zinc-800"
         >
           <div className="col-span-7 flex justify-center items-center p-6">
-            <p className="text-zinc-300 text-center">
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Assumenda
-              nulla amet, at error magni quaerat, voluptatem unde sapiente ab
-              quo enim eaque voluptatum aliquam. Eligendi doloribus voluptate
-              beatae at in. Lorem ipsum dolor sit amet consectetur adipisicing
-              elit.
-            </p>
+            <p className="text-zinc-300 text-center">{post.content}</p>
           </div>
 
           <div className="flex flex-col col-span-5 bg-zinc-950 rounded-r-lg">
             <div className="flex justify-between border-b-[1px] border-zinc-900 p-6">
               <div className="flex items-center gap-3">
-                <Avatar className="size-10" />
+                <Avatar
+                  src={user?.avatar}
+                  className={`size-10 ${backgroundColor}`}
+                />
 
                 <div>
                   <h1 className="text-zinc-300 text-sm font-semibold">
-                    natanfoleto
+                    {user?.name}
                   </h1>
 
                   <time className="text-zinc-500 text-xs">
-                    {formatDistanceToNow(new Date(), {
+                    {formatDistanceToNow(post.updatedAt || post.publishedAt, {
                       locale: ptBR,
                     })}{' '}
-                    {new Date() && '(editado)'}
+                    {post.updatedAt && '(editado)'}
                   </time>
                 </div>
               </div>
 
-              <Ellipsis className="text-zinc-500 size-5 cursor-pointer transition-colors hover:text-zinc-400" />
+              <Ellipsis
+                onClick={handleModalOptions}
+                className="text-zinc-500 size-5 cursor-pointer transition-colors hover:text-zinc-400"
+              />
             </div>
 
-            <div className="space-y-8 flex-1 border-b-[1px] border-zinc-900 p-6">
-              <Comment />
-              <Comment />
+            <div
+              className="overflow-y-scroll overflow-x-hidden space-y-8 flex-1 border-b-[1px] border-zinc-900 p-6"
+              style={{ maxHeight: 'calc(100vh - 258px)' }}
+            >
+              {post.comments.map((comment) => (
+                <Comment
+                  key={comment.id}
+                  id={comment.id}
+                  postId={comment.postId}
+                  content={comment.content}
+                  commentedAt={comment.commentedAt}
+                  updatedAt={comment.updatedAt}
+                  reactions={comment.reactions}
+                />
+              ))}
             </div>
 
             <div className="flex items-center justify-between border-b-[1px] border-zinc-900 p-4">
               <div className="flex items-center gap-2 text-zinc-400">
-                <Heart className="size-5 cursor-pointer transition-opacity hover:opacity-50" />
+                <Reaction className="size-5" />
+
                 <MessageCircle
                   onClick={() => inputRef.current?.focus()}
                   className="size-5 cursor-pointer transition-opacity hover:opacity-50"
@@ -102,6 +135,8 @@ export function PostPreview({ open, setOpen }: PostPreviewProps) {
               </button>
             </form>
           </div>
+
+          <Options open={modalOptions} setOpen={handleModalOptions} />
         </div>
       </div>
     )
