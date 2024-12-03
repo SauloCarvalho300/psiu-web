@@ -1,16 +1,23 @@
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { HTTPError } from 'ky'
 import { Bookmark, Ellipsis, MessageCircle, X } from 'lucide-react'
 import { type FormEvent, useRef, useState } from 'react'
+import { toast } from 'sonner'
+
+import { REACTION_LIST } from '@/constants/reactions'
+import { usePost } from '@/contexts/post'
+import type { IPost } from '@/http/posts/types'
+import type { IReactionPost } from '@/http/reactions/types'
 
 import { Avatar } from '../avatar'
-import type { PostProps } from '.'
 import { Comment } from './comment'
 import { Options } from './options'
 import { Reaction } from './reaction'
 
 interface PostPreviewProps {
-  post: PostProps
+  post: IPost
+  reaction?: IReactionPost
   user?: {
     name: string
     avatar: string
@@ -22,11 +29,14 @@ interface PostPreviewProps {
 
 export function PostPreview({
   post,
+  reaction,
   user,
   backgroundColor,
   open,
   setOpen,
 }: PostPreviewProps) {
+  const { onCreateComment, onDeletePostReaction } = usePost()
+
   const [comment, setComment] = useState('')
   const [modalOptions, setModalOptions] = useState(false)
 
@@ -36,8 +46,29 @@ export function PostPreview({
     setModalOptions(!modalOptions)
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+
+    try {
+      const { result } = await onCreateComment({
+        postId: post.id,
+        content: comment,
+      })
+
+      if (result === 'success') setComment('')
+    } catch (error) {
+      console.log(error)
+
+      if (error instanceof HTTPError) {
+        const { message } = await error.response.json()
+
+        toast.error(message)
+      }
+    }
+  }
+
+  async function handleDeleteReaction(reactionId: string) {
+    await onDeletePostReaction({ reactionId })
   }
 
   return (
@@ -55,8 +86,20 @@ export function PostPreview({
           onClick={(e) => e.stopPropagation()}
           className="w-[1280px] grid grid-cols-12 rounded-lg bg-zinc-800"
         >
-          <div className="col-span-7 flex justify-center items-center p-6">
-            <p className="text-zinc-300 text-center">{post.content}</p>
+          <div className="relative col-span-7 flex justify-center items-center overflow-hidden px-8 pt-8 pb-20">
+            <p className="flex items-center justify-center text-zinc-300 overflow-y-auto h-full">
+              {post.content}
+            </p>
+
+            {reaction && (
+              <button
+                onClick={() => handleDeleteReaction(reaction.id)}
+                title="Clique para remover sua reação"
+                className="absolute left-1/2 -translate-x-1/2 bottom-7 text-zinc-400 text-sm"
+              >
+                Você reagiu com {REACTION_LIST[reaction.type].icon}
+              </button>
+            )}
           </div>
 
           <div className="flex flex-col col-span-5 bg-zinc-950 rounded-r-lg">
@@ -94,27 +137,37 @@ export function PostPreview({
               {post.comments.map((comment) => (
                 <Comment
                   key={comment.id}
-                  id={comment.id}
-                  postId={comment.postId}
-                  content={comment.content}
-                  commentedAt={comment.commentedAt}
-                  updatedAt={comment.updatedAt}
-                  reactions={comment.reactions}
+                  comment={{
+                    id: comment.id,
+                    isOwner: comment.isOwner,
+                    postId: comment.postId,
+                    content: comment.content,
+                    commentedAt: comment.commentedAt,
+                    updatedAt: comment.updatedAt,
+                    reactions: comment.reactions,
+                  }}
                 />
               ))}
             </div>
 
-            <div className="flex items-center justify-between border-b-[1px] border-zinc-900 p-4">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <Reaction className="size-5" />
+            <div className="border-b-[1px] border-zinc-900 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <Reaction postId={post.id} className="size-5" />
 
-                <MessageCircle
-                  onClick={() => inputRef.current?.focus()}
-                  className="size-5 cursor-pointer transition-opacity hover:opacity-50"
-                />
+                  <MessageCircle
+                    onClick={() => inputRef.current?.focus()}
+                    className="size-5 cursor-pointer transition-opacity hover:opacity-50"
+                  />
+                </div>
+
+                <Bookmark className="size-5 text-zinc-400 cursor-pointer transition-opacity hover:opacity-50" />
               </div>
 
-              <Bookmark className="size-5 text-zinc-400 cursor-pointer transition-opacity hover:opacity-50" />
+              <p className="text-xs text-zinc-400 cursor-pointer hover:underline">
+                <strong>{post.reactions.length}</strong> pessoas reagiram essa
+                publicação
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="flex items-center">
