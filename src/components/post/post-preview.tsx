@@ -2,7 +2,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { HTTPError } from 'ky'
 import { Bookmark, Ellipsis, MessageCircle, X } from 'lucide-react'
-import { type FormEvent, useRef, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { REACTION_LIST } from '@/constants/reactions'
@@ -14,6 +14,7 @@ import { Avatar } from '../avatar'
 import { Comment } from './comment'
 import { Options } from './options'
 import { Reaction } from './reaction'
+import { ReactionList } from './reaction-list'
 
 interface PostPreviewProps {
   post: IPost
@@ -39,11 +40,16 @@ export function PostPreview({
 
   const [comment, setComment] = useState('')
   const [modalOptions, setModalOptions] = useState(false)
+  const [modalReactionList, setModalReactionList] = useState(false)
 
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   function handleModalOptions() {
     setModalOptions(!modalOptions)
+  }
+
+  function handleModalReactionList() {
+    setModalReactionList(!modalReactionList)
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -70,6 +76,24 @@ export function PostPreview({
   async function handleDeleteReaction(reactionId: string) {
     await onDeletePostReaction({ reactionId })
   }
+
+  const handleEsc = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && open && !modalOptions) {
+        event.stopPropagation()
+        setOpen()
+      }
+    },
+    [open, modalOptions, setOpen],
+  )
+
+  useEffect(() => {
+    if (open && !modalOptions) document.addEventListener('keydown', handleEsc)
+
+    return () => {
+      document.removeEventListener('keydown', handleEsc)
+    }
+  }, [open, modalOptions, handleEsc])
 
   return (
     open && (
@@ -164,7 +188,12 @@ export function PostPreview({
                 <Bookmark className="size-5 text-zinc-400 cursor-pointer transition-opacity hover:opacity-50" />
               </div>
 
-              <p className="text-xs text-zinc-400 cursor-pointer hover:underline">
+              <p
+                onClick={
+                  post.reactions.length ? handleModalReactionList : undefined
+                }
+                className="text-xs text-zinc-400 cursor-pointer hover:underline"
+              >
                 <strong>{post.reactions.length}</strong> pessoas reagiram essa
                 publicação
               </p>
@@ -189,7 +218,19 @@ export function PostPreview({
             </form>
           </div>
 
-          <Options open={modalOptions} setOpen={handleModalOptions} />
+          <Options
+            postId={post.id}
+            content={post.content}
+            isOwner={post.isOwner}
+            open={modalOptions}
+            setOpen={handleModalOptions}
+          />
+
+          <ReactionList
+            open={modalReactionList}
+            setOpen={handleModalReactionList}
+            reactions={post.reactions}
+          />
         </div>
       </div>
     )

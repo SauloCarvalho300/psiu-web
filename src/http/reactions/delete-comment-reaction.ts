@@ -13,7 +13,7 @@ export async function deleteCommentReaction({
   reactionId,
 }: DeleteCommentReactionRequest) {
   const response = await api
-    .delete(`reaction/Comment/${reactionId}`)
+    .delete(`reaction/comment/${reactionId}`)
     .json<DeleteCommentReactionResponse>()
 
   return response
